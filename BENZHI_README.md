@@ -13,28 +13,28 @@
 （已设置 `GOTOOLCHAIN=local`，Go 版本 `go1.26.3`）。
 
 ```bash
-# 1) 依赖 vendoring（离线构建所需，需先联网一次）
+# 1) 下载 Go module 依赖（构建阶段使用国内代理）
 GOTOOLCHAIN=local GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn \
-  go mod vendor
+  go mod download
 
 # 2) 编译（CGO 关闭，双架构 linux/amd64 与 linux/arm64）
-CGO_ENABLED=0 GOTOOLCHAIN=local go build -mod=vendor ./...
+CGO_ENABLED=0 GOTOOLCHAIN=local go build ./...
 
 # 3) 运行（HTTP 服务，默认 :8080，数据库文件 shortlink.db）
-CGO_ENABLED=0 GOTOOLCHAIN=local go run -mod=vendor . --addr :8080 --db shortlink.db
+CGO_ENABLED=0 GOTOOLCHAIN=local go run . --addr :8080 --db shortlink.db
 
 # 4) 测试
-CGO_ENABLED=0 GOTOOLCHAIN=local go test -mod=vendor ./...
-CGO_ENABLED=0 GOTOOLCHAIN=local go vet  -mod=vendor ./...
+CGO_ENABLED=0 GOTOOLCHAIN=local go test ./...
+CGO_ENABLED=0 GOTOOLCHAIN=local go vet ./...
 
 # 5) 自检（不依赖外部服务，执行后自行退出，exit 0 表示通过）
-go run -mod=vendor . --smoke-test
+go run . --smoke-test
 ```
 
 ## Docker 容器交付
 
 ```bash
-# 健康基线自检镜像（离线 vendor 构建，支持 --smoke-test）
+# 健康基线自检镜像（module mode 构建，支持 --smoke-test）
 docker buildx build --platform linux/amd64 --load -t go-task-check:amd64 .
 docker run --rm go-task-check:amd64 --smoke-test
 docker buildx build --platform linux/arm64 --load -t go-task-check:arm64 .

@@ -41,7 +41,7 @@ func (s *Service) DailyBreakdown(ctx context.Context, code, from, to string) ([]
 
 // TopLinks 返回热门短码排行；ctx 被显式传递并在已取消时立即返回。
 func (s *Service) TopLinks(ctx context.Context, owner string, limit int) ([]store.TopLink, error) {
-	return s.store.TopLinks(context.Background(), owner, limit)
+	return s.store.TopLinks(ctx, owner, limit)
 }
 
 // Referers 返回按来源聚合的点击分布。

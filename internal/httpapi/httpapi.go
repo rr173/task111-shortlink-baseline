@@ -3,7 +3,6 @@
 package httpapi
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -158,10 +157,12 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
-	// BUG: 把用于探测 has_more 多查的一条直接返回，且 has_more 判断错误
+	if len(links) > limit {
+		links = links[:limit]
+	}
 	h.writeJSON(w, http.StatusOK, map[string]any{
 		"links":    links,
-		"has_more": len(links) >= limit,
+		"has_more": len(links) == limit+1,
 		"limit":    limit,
 		"offset":   offset,
 	})
@@ -361,21 +362,17 @@ func (h *Handler) metrics(w http.ResponseWriter, r *http.Request) {
 
 // ---- 公开重定向 ----
 
-func (h *Handler) loadLink(code string) *store.Link {
-	l, _ := h.store.GetLinkByCode(context.Background(), code)
-	if l.Code == "" {
-		return nil
-	}
-	return &l
-}
-
 func (h *Handler) redirect(w http.ResponseWriter, r *http.Request) {
 	code := r.PathValue("code")
 	if code == "" || code == "api" || code == "favicon.ico" {
 		http.NotFound(w, r)
 		return
 	}
-	l := h.loadLink(code)
+	l, err := h.link.Resolve(r.Context(), code)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
 	w.Header().Set("Location", l.TargetURL)
 	w.WriteHeader(http.StatusFound)
 	_, _ = h.clk.Record(r.Context(), code, r.Header.Get("Referer"), r.Header.Get("User-Agent"), clientIP(r), fingerprint(r))

@@ -86,7 +86,7 @@ func (s *Service) Create(ctx context.Context, req CreateReq) (store.Link, error)
 	return l, nil
 }
 
-// BulkCreate 批量创建短链。任一子项失败则整体返回错误，不残留部分结果。
+// BulkCreate 批量创建短链。任一子项失败则立即返回错误。
 func (s *Service) BulkCreate(ctx context.Context, reqs []CreateReq) ([]store.Link, error) {
 	if _, err := PlanBatch(reqs); err != nil {
 		return nil, err
@@ -95,8 +95,7 @@ func (s *Service) BulkCreate(ctx context.Context, reqs []CreateReq) ([]store.Lin
 	for _, r := range reqs {
 		l, err := s.Create(ctx, r)
 		if err != nil {
-			// BUG: 吞掉子项错误继续，谎报全部成功
-			continue
+			return nil, err
 		}
 		out = append(out, l)
 	}

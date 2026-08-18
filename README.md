@@ -12,10 +12,10 @@
 ## 快速开始
 
 ```bash
-GOTOOLCHAIN=local GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn go mod vendor
-CGO_ENABLED=0 GOTOOLCHAIN=local go run -mod=vendor . --addr :8080 --db shortlink.db
-CGO_ENABLED=0 GOTOOLCHAIN=local go test -mod=vendor ./...
-go run -mod=vendor . --smoke-test
+GOTOOLCHAIN=local GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn go mod download
+CGO_ENABLED=0 GOTOOLCHAIN=local go run . --addr :8080 --db shortlink.db
+CGO_ENABLED=0 GOTOOLCHAIN=local go test ./...
+go run . --smoke-test
 ```
 
 ## 目录结构
@@ -31,7 +31,7 @@ env/
 │   ├── click/             点击采集
 │   ├── stat/              统计聚合：按天 / 来源 / 热门 / 总量
 │   └── httpapi/           HTTP 路由与处理器
-├── Dockerfile             健康基线自检镜像（离线 vendor 构建）
+├── Dockerfile             健康基线自检镜像（module mode 构建）
 ├── benzhi.Dockerfile      benzhi 评测镜像
 ├── build_benzhi_docker.sh benzhi 镜像构建脚本
 └── BENZHI_README.md       评测与命令说明
