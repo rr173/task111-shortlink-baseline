@@ -213,7 +213,7 @@ func (s *Store) SearchLinks(ctx context.Context, q string, limit int) ([]Link, e
 	like := "%" + q + "%"
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, code, target_url, owner, description, created_at, expires_at, max_clicks, custom_alias
-		 FROM links WHERE target_url LIKE ? OR description LIKE ? ORDER BY id DESC LIMIT ?`,
+		 FROM links WHERE target_url LIKE ? ESCAPE '\' OR description LIKE ? ESCAPE '\' ORDER BY id DESC LIMIT ?`,
 		like, like, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search links: %w", err)

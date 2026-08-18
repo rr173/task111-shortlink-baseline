@@ -192,6 +192,7 @@ func (s *Service) Search(ctx context.Context, q string, limit int) ([]store.Link
 	if limit <= 0 {
 		limit = 20
 	}
+	q = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q)
 	return s.store.SearchLinks(ctx, q, limit)
 }
 
