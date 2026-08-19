@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -208,12 +209,18 @@ func (s *Store) CountLinks(ctx context.Context, owner string) (int, error) {
 	return n, nil
 }
 
+// escapeLike 转义 SQL LIKE 通配符（% 与 _）及转义符本身（\），
+// 使搜索串中的这些字符按字面值匹配而非被当作通配符。
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
 // SearchLinks 按 target_url 或 description 模糊匹配。
 func (s *Store) SearchLinks(ctx context.Context, q string, limit int) ([]Link, error) {
-	like := "%" + q + "%"
+	like := "%" + escapeLike(q) + "%"
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, code, target_url, owner, description, created_at, expires_at, max_clicks, custom_alias
-		 FROM links WHERE target_url LIKE ? OR description LIKE ? ORDER BY id DESC LIMIT ?`,
+		 FROM links WHERE target_url LIKE ? ESCAPE '\' OR description LIKE ? ESCAPE '\' ORDER BY id DESC LIMIT ?`,
 		like, like, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search links: %w", err)
