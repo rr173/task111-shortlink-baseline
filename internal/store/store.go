@@ -377,6 +377,28 @@ func (s *Store) RecentClicks(ctx context.Context, limit int) ([]Click, error) {
 	return out, rows.Err()
 }
 
+// RecentClicksByCode 返回某短码最近的点击记录，沿用全局 RecentClicks 的
+// 时间范围与排序规则（按 clicked_at 倒序、取最近 limit 条），仅把归属范围
+// 限定在指定短码，避免活动窗口混入其他短码的访问记录。
+func (s *Store) RecentClicksByCode(ctx context.Context, code string, limit int) ([]Click, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, code, clicked_at, referer, user_agent, ip, fingerprint, day
+		 FROM clicks WHERE code = ? ORDER BY clicked_at DESC LIMIT ?`, code, limit)
+	if err != nil {
+		return nil, fmt.Errorf("recent clicks by code %q: %w", code, err)
+	}
+	defer rows.Close()
+	out := []Click{}
+	for rows.Next() {
+		var c Click
+		if err := rows.Scan(&c.ID, &c.Code, &c.ClickedAt, &c.Referer, &c.UserAgent, &c.IP, &c.Fingerprint, &c.Day); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 // ResetClicks 清空某短码的全部点击（用于测试与重置）。
 func (s *Store) ResetClicks(ctx context.Context, code string) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM clicks WHERE code = ?`, code); err != nil {

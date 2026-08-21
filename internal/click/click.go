@@ -34,3 +34,11 @@ func (s *Service) Recent(ctx context.Context, limit int) ([]store.Click, error) 
 	limit = NormalizeLimit(limit)
 	return s.store.RecentClicks(ctx, limit)
 }
+
+// RecentByCode 返回指定短码最近的点击记录，时间范围与排序规则与 Recent
+// 一致（按 clicked_at 倒序取最近 limit 条），仅把归属范围限定在该短码，
+// 用于单短码活动窗口，避免混入其他短码的访问记录。
+func (s *Service) RecentByCode(ctx context.Context, code string, limit int) ([]store.Click, error) {
+	limit = NormalizeLimit(limit)
+	return s.store.RecentClicksByCode(ctx, code, limit)
+}
