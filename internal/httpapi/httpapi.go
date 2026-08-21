@@ -390,7 +390,7 @@ func (h *Handler) writeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, link.ErrOwnerQuotaExceeded):
 		h.writeJSON(w, http.StatusConflict, errResp(err.Error()))
-	case errors.Is(err, link.ErrNotFound):
+	case errors.Is(err, store.ErrLinkNotFound), errors.Is(err, link.ErrNotFound):
 		h.writeJSON(w, http.StatusNotFound, errResp("link not found"))
 	case errors.Is(err, link.ErrExpired), errors.Is(err, link.ErrLimitReached):
 		h.writeJSON(w, http.StatusGone, errResp(err.Error()))

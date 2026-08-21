@@ -16,6 +16,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// 领域错误。ErrLinkNotFound 表示点击归属的短链不存在，
+// 用于阻止无效短码产生无法归属的访问历史。
+var ErrLinkNotFound = errors.New("link not found")
+
 // Link 是短链的核心实体。
 type Link struct {
 	ID          int64  `json:"id"`
@@ -273,6 +277,46 @@ func (s *Store) InsertClick(ctx context.Context, c Click) (Click, error) {
 		c.Code, c.ClickedAt, c.Referer, c.UserAgent, c.IP, c.Fingerprint, c.Day)
 	if err != nil {
 		return Click{}, fmt.Errorf("insert click %q: %w", c.Code, err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return Click{}, fmt.Errorf("last insert id: %w", err)
+	}
+	c.ID = id
+	return c, nil
+}
+
+// InsertClickForExistingLink 写入一条点击记录，但仅当短码归属的短链确实存在时。
+// 无效短码会被拒绝（返回 ErrLinkNotFound）且不留下任何访问历史。
+// 存在性检查与写入在同一事务内完成：Open 设置 SetMaxOpenConns(1)，
+// 串行执行保证检查与写入之间无并发写入，杜绝 check-then-insert 竞态。
+func (s *Store) InsertClickForExistingLink(ctx context.Context, c Click) (Click, error) {
+	if c.ClickedAt == 0 {
+		c.ClickedAt = time.Now().UnixMilli()
+	}
+	c.Day = dayOf(c.ClickedAt)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Click{}, fmt.Errorf("begin tx: %w", err)
+	}
+	var exists string
+	if err := tx.QueryRowContext(ctx, `SELECT code FROM links WHERE code = ?`, c.Code).Scan(&exists); err != nil {
+		_ = tx.Rollback()
+		if errors.Is(err, sql.ErrNoRows) {
+			return Click{}, ErrLinkNotFound
+		}
+		return Click{}, fmt.Errorf("check link %q: %w", c.Code, err)
+	}
+	res, err := tx.ExecContext(ctx,
+		`INSERT INTO clicks (code, clicked_at, referer, user_agent, ip, fingerprint, day)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		c.Code, c.ClickedAt, c.Referer, c.UserAgent, c.IP, c.Fingerprint, c.Day)
+	if err != nil {
+		_ = tx.Rollback()
+		return Click{}, fmt.Errorf("insert click %q: %w", c.Code, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return Click{}, fmt.Errorf("commit click %q: %w", c.Code, err)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {

@@ -18,8 +18,9 @@ func New(s *store.Store) *Service { return &Service{store: s} }
 
 // Record 写入一条点击记录，返回落库后的完整记录。
 // fingerprint 用于同一浏览器在短时间内重复刷新时的去重。
+// 无效短码（不存在对应短链）会被拒绝且不产生访问历史，避免遗留无法归属的孤儿点击。
 func (s *Service) Record(ctx context.Context, code, referer, ua, ip, fingerprint string) (store.Click, error) {
-	return s.store.InsertClick(ctx, store.Click{
+	return s.store.InsertClickForExistingLink(ctx, store.Click{
 		Code:        code,
 		Referer:     referer,
 		UserAgent:   ua,
