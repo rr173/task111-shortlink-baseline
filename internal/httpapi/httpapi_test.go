@@ -90,3 +90,36 @@ func TestListLargeLimit(t *testing.T) {
 		t.Fatal("has_more should be false when limit exceeds total")
 	}
 }
+
+// TestOwnerReportTrimsOwner 验证运营人员查看负责人报表时，owner 入参带
+// 首尾空格不会让本应属于该负责人的链接数和活跃数变成零。
+func TestOwnerReportTrimsOwner(t *testing.T) {
+	h := newServer(t)
+	create := httptest.NewRequest(http.MethodPost, "/api/links", strings.NewReader(`{"target_url":"https://a.com","owner":"alice"}`))
+	h.ServeHTTP(httptest.NewRecorder(), create)
+
+	// 查询时 owner 带首尾空格。
+	req := httptest.NewRequest(http.MethodGet, "/api/reports/owner?owner=%20%20alice%20", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("report code = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var rep struct {
+		Owner       string `json:"owner"`
+		Links       int    `json:"links"`
+		ActiveLinks int    `json:"active_links"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &rep); err != nil {
+		t.Fatal(err)
+	}
+	if rep.Links != 1 {
+		t.Fatalf("links = %d, want 1 (leading/trailing whitespace must not zero out attribution)", rep.Links)
+	}
+	if rep.ActiveLinks != 1 {
+		t.Fatalf("active_links = %d, want 1", rep.ActiveLinks)
+	}
+	if rep.Owner != "alice" {
+		t.Fatalf("owner = %q, want normalized \"alice\"", rep.Owner)
+	}
+}

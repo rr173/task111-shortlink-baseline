@@ -98,3 +98,52 @@ func TestStatusNoLimit(t *testing.T) {
 		t.Fatalf("remaining = %d, want -1", st.Remaining)
 	}
 }
+
+// TestOwnerReportTrimsOwner 验证按负责人查看报表时，输入名称带首尾空格
+// 仍能正确归属统计：创建路径会对负责人做 TrimSpace 后持久化，因此报表
+// 查询键也必须先归一化，否则精确匹配不到任何行，链接数与活跃数会误判为 0。
+func TestOwnerReportTrimsOwner(t *testing.T) {
+	svc := newSvc(t)
+	if _, err := svc.Create(context.Background(), CreateReq{TargetURL: "https://a.com", Owner: "  alice  "}); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := svc.OwnerReport(context.Background(), "  alice  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Links != 1 {
+		t.Fatalf("links = %d, want 1 (leading/trailing whitespace must not break attribution)", rep.Links)
+	}
+	if rep.ActiveLinks != 1 {
+		t.Fatalf("active_links = %d, want 1", rep.ActiveLinks)
+	}
+	if rep.Owner != "alice" {
+		t.Fatalf("owner = %q, want normalized \"alice\"", rep.Owner)
+	}
+}
+
+// TestOwnerReportIsolatesOwners 验证不同负责人的数据在归一化后仍彼此隔离：
+// 相同负责人带不同空格应归到同一报表，且不应把其他负责人的链接计入。
+func TestOwnerReportIsolatesOwners(t *testing.T) {
+	svc := newSvc(t)
+	if _, err := svc.Create(context.Background(), CreateReq{TargetURL: "https://a.com", Owner: "alice"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Create(context.Background(), CreateReq{TargetURL: "https://b.com", Owner: "bob"}); err != nil {
+		t.Fatal(err)
+	}
+	alice, err := svc.OwnerReport(context.Background(), "  alice ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if alice.Links != 1 || alice.Owner != "alice" {
+		t.Fatalf("alice report = %+v, want links=1 owner=alice", alice)
+	}
+	bob, err := svc.OwnerReport(context.Background(), "bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bob.Links != 1 || bob.Owner != "bob" {
+		t.Fatalf("bob report = %+v, want links=1 owner=bob", bob)
+	}
+}
